@@ -11,6 +11,7 @@ Bi-directional sync between your Obsidian markdown notes and Google Drive using 
 - **Google Drive API integration**: Direct sync to your Google Drive folder
 - **Incremental sync**: Only uploads/downloads changed files
 - **Deletion support**: Removes files from Drive when deleted locally
+- **Empty folder cleanup**: Automatically removes empty folders from Google Drive
 - **Persistent authentication**: OAuth token saved locally for future runs
 
 ## Setup
@@ -77,6 +78,7 @@ This will:
 - Upload new `.md` files to Google Drive
 - Update modified files in Google Drive
 - Delete files from Google Drive that were deleted locally
+- Remove empty folders from Google Drive automatically
 - Create folder structure in Google Drive matching your local vault
 
 ### Pull from Google Drive (Download)
@@ -115,6 +117,14 @@ python push2Google.py --setup
 python push2Google.py --init
 ```
 
+### Manually Clean Empty Folders
+
+```bash
+python push2Google.py --clean-folders
+```
+
+Note: Empty folder cleanup runs automatically during normal sync, but this flag can be used to clean folders manually.
+
 ## How It Works
 
 ### Push (push2Google.py)
@@ -123,7 +133,8 @@ python push2Google.py --init
 3. **Sync Operations**:
    - **New files**: Uploaded to Google Drive (creates folders as needed)
    - **Modified files**: Updated in Google Drive
-   - **Deleted files**: Removed from Google Drive (including empty folders)
+   - **Deleted files**: Removed from Google Drive
+   - **Empty folders**: Recursively scanned and removed from Google Drive
 4. **Tracking**: Stores Drive file IDs and checksums for future comparisons
 
 ### Pull (pullFromGoogle.py)
@@ -189,6 +200,7 @@ Install dependencies: `pip install -r requirements.txt`
 - [x] ✅ Modify existing file → uploads to Drive
 - [x] ✅ Delete file locally → deleted in Drive
 - [x] ✅ Delete folder locally → deleted in Drive (when empty)
+- [x] ✅ Empty folders automatically cleaned from Drive on every sync
 - [x] ✅ Add new file in Drive → downloads locally
 - [x] ✅ Modify file in Drive → updates locally (via modifiedTime tracking)
 
@@ -200,7 +212,3 @@ Install dependencies: `pip install -r requirements.txt`
 - Folder structure is preserved in both directions
 - Use `push2Google.py` at end of day, `pullFromGoogle.py` at start of day
 
-
-![alt text](image.png)
-
-![alt text](image-1.png)

@@ -141,6 +141,19 @@ def calculate_checksum(file_path):
             sha256.update(chunk)
     return sha256.hexdigest()
 
+def cleanup_empty_folders(path):
+    """Recursively remove empty folders"""
+    for item in path.iterdir():
+        if item.is_dir():
+            cleanup_empty_folders(item)
+            # Try to remove if empty
+            try:
+                if not any(item.iterdir()):
+                    item.rmdir()
+                    print(f"  Removed empty folder: {item.relative_to(VAULT_PATH)}")
+            except OSError:
+                pass  # Not empty or can't be removed
+
 def pull_from_google_drive(dry_run=False):
     """Pull new/modified files from Google Drive"""
     service = get_google_drive_service()
@@ -155,6 +168,7 @@ def pull_from_google_drive(dry_run=False):
 
     new_files = []
     modified_files = []
+    deleted_files = []
 
     # Check for new and modified files
     for file_path, drive_info in drive_files.items():
@@ -174,6 +188,11 @@ def pull_from_google_drive(dry_run=False):
             # File was deleted locally
             new_files.append(file_path)
 
+    # Check for files deleted from Drive
+    for file_path in local_checksums:
+        if file_path not in drive_files:
+            deleted_files.append(file_path)
+
     # Report changes
     if new_files:
         print(f"\nNew files in Drive ({len(new_files)}):")
@@ -185,7 +204,12 @@ def pull_from_google_drive(dry_run=False):
         for f in modified_files:
             print(f"  * {f}")
 
-    if not (new_files or modified_files):
+    if deleted_files:
+        print(f"\nDeleted from Drive ({len(deleted_files)}):")
+        for f in deleted_files:
+            print(f"  - {f}")
+
+    if not (new_files or modified_files or deleted_files):
         print("\nNo new changes in Google Drive")
         return
 
@@ -216,6 +240,23 @@ def pull_from_google_drive(dry_run=False):
             print(f"  {status}: {file_path}")
         except Exception as e:
             print(f"  Error downloading {file_path}: {e}")
+
+    # Delete local files that were deleted from Drive
+    for file_path in deleted_files:
+        local_path = VAULT_PATH / file_path
+        try:
+            if local_path.exists():
+                local_path.unlink()
+                print(f"  Removed: {file_path}")
+            # Remove from checksums
+            del local_checksums[file_path]
+        except Exception as e:
+            print(f"  Error removing {file_path}: {e}")
+
+    # Clean up empty local folders
+    if deleted_files:
+        print("\nCleaning up empty local folders...")
+        cleanup_empty_folders(VAULT_PATH)
 
     # Save updated checksums
     save_checksums(local_checksums)

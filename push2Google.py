@@ -159,6 +159,26 @@ def delete_from_drive(service, file_id):
     """Delete file from Google Drive"""
     service.files().delete(fileId=file_id).execute()
 
+def delete_empty_folders(service, parent_folder_id):
+    """Recursively delete empty folders from Google Drive"""
+    query = f"'{parent_folder_id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
+    results = service.files().list(q=query, fields="files(id, name)").execute()
+    folders = results.get('files', [])
+
+    for folder in folders:
+        # Recursively check subfolders first
+        delete_empty_folders(service, folder['id'])
+
+        # Check if folder is empty
+        query = f"'{folder['id']}' in parents and trashed=false"
+        results = service.files().list(q=query, fields="files(id)", pageSize=1).execute()
+        files_in_folder = results.get('files', [])
+
+        # Delete if empty
+        if not files_in_folder:
+            service.files().delete(fileId=folder['id']).execute()
+            print(f"  Removed empty folder: {folder['name']}")
+
 def sync_to_google_drive():
     """Sync modified files to Google Drive"""
     service = get_google_drive_service()
@@ -215,6 +235,9 @@ def sync_to_google_drive():
 
     if not (new_files or modified_files or deleted_files):
         print("\nNo changes detected")
+        # Still clean up empty folders even if no file changes
+        print("\nCleaning up empty folders...")
+        delete_empty_folders(service, DRIVE_FOLDER_ID)
         return
 
     # Sync to Google Drive
@@ -261,6 +284,11 @@ def sync_to_google_drive():
             except Exception as e:
                 print(f"  Error removing {file_path_str}: {e}")
 
+    # Clean up empty folders
+    if deleted_files:
+        print("\nCleaning up empty folders...")
+        delete_empty_folders(service, DRIVE_FOLDER_ID)
+
     # Save new checksums
     save_checksums(new_checksums)
     print(f"\nSync complete! Updated checksums saved")
@@ -270,6 +298,7 @@ def main():
     parser.add_argument('--init', action='store_true', help='Initialize checksums without syncing')
     parser.add_argument('--show-status', action='store_true', help='Show current sync status')
     parser.add_argument('--setup', action='store_true', help='Show setup instructions')
+    parser.add_argument('--clean-folders', action='store_true', help='Remove empty folders from Google Drive')
 
     args = parser.parse_args()
 
@@ -300,6 +329,14 @@ def main():
         print(f"Total notes: {len(notes)}")
         print(f"Tracked files: {len(old_checksums)}")
         print(f"Drive folder ID: {DRIVE_FOLDER_ID}")
+        return
+
+    if args.clean_folders:
+        print("Cleaning up empty folders from Google Drive...")
+        service = get_google_drive_service()
+        if service:
+            delete_empty_folders(service, DRIVE_FOLDER_ID)
+            print("Done!")
         return
 
     if args.init:
