@@ -104,8 +104,11 @@ def list_drive_files(service, folder_id, path=""):
             subfolder_path = f"{path}/{item_name}" if path else item_name
             subfiles = list_drive_files(service, item_id, subfolder_path)
             files_dict.update(subfiles)
-        elif item_name.endswith('.md'):
-            # Add markdown file to dict
+        elif (item_name.endswith('.md') or item_name.endswith('.txt') or
+              item_name.endswith('.png') or item_name.endswith('.jpg') or
+              item_name.endswith('.jpeg') or item_name.endswith('.gif') or
+              item_name.endswith('.webp') or item_name.endswith('.svg')):
+            # Add file to dict
             file_path = f"{path}/{item_name}" if path else item_name
             files_dict[file_path] = {
                 'id': item_id,
@@ -162,7 +165,7 @@ def pull_from_google_drive(dry_run=False):
 
     print(f"Scanning Google Drive folder: {DRIVE_FOLDER_ID}")
     drive_files = list_drive_files(service, DRIVE_FOLDER_ID)
-    print(f"Found {len(drive_files)} markdown files in Google Drive")
+    print(f"Found {len(drive_files)} files in Google Drive (markdown, text, and images)")
 
     local_checksums = load_checksums()
 

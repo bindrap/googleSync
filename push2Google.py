@@ -58,8 +58,19 @@ def save_checksums(checksums):
         json.dump(checksums, f, indent=2)
 
 def get_all_notes():
-    """Get all markdown files in vault"""
-    return list(VAULT_PATH.glob('**/*.md'))
+    """Get all markdown, text, and image files in vault"""
+    files = []
+    # Text files
+    files.extend(VAULT_PATH.glob('**/*.md'))
+    files.extend(VAULT_PATH.glob('**/*.txt'))
+    # Image files
+    files.extend(VAULT_PATH.glob('**/*.png'))
+    files.extend(VAULT_PATH.glob('**/*.jpg'))
+    files.extend(VAULT_PATH.glob('**/*.jpeg'))
+    files.extend(VAULT_PATH.glob('**/*.gif'))
+    files.extend(VAULT_PATH.glob('**/*.webp'))
+    files.extend(VAULT_PATH.glob('**/*.svg'))
+    return files
 
 def get_google_drive_service():
     """Authenticate and return Google Drive API service"""
@@ -141,10 +152,21 @@ def upload_to_drive(service, file_path, parent_folder_id, file_id=None):
 
     if file_id:
         # Update existing file
-        file = service.files().update(
-            fileId=file_id,
-            media_body=media
-        ).execute()
+        try:
+            file = service.files().update(
+                fileId=file_id,
+                media_body=media
+            ).execute()
+        except Exception as e:
+            # If file not found (404), create new file instead
+            if '404' in str(e) or 'not found' in str(e).lower():
+                file = service.files().create(
+                    body=file_metadata,
+                    media_body=media,
+                    fields='id'
+                ).execute()
+            else:
+                raise
     else:
         # Create new file
         file = service.files().create(
@@ -189,7 +211,7 @@ def sync_to_google_drive():
     new_checksums = {}
 
     notes = get_all_notes()
-    print(f"Found {len(notes)} markdown files")
+    print(f"Found {len(notes)} files (markdown, text, and images)")
 
     new_files = []
     modified_files = []
@@ -282,7 +304,11 @@ def sync_to_google_drive():
                 delete_from_drive(service, drive_id)
                 print(f"  Removed: {file_path_str}")
             except Exception as e:
-                print(f"  Error removing {file_path_str}: {e}")
+                # Silently skip 404 errors (file already deleted)
+                if '404' in str(e) or 'not found' in str(e).lower():
+                    print(f"  Skipped (already removed): {file_path_str}")
+                else:
+                    print(f"  Error removing {file_path_str}: {e}")
 
     # Clean up empty folders
     if deleted_files:
