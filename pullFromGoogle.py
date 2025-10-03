@@ -146,12 +146,15 @@ def calculate_checksum(file_path):
 
 def cleanup_empty_folders(path):
     """Recursively remove empty folders"""
+    # Folders to preserve even when empty
+    PRESERVE_FOLDERS = {'img', 'weekly', 'neovim'}
+
     for item in path.iterdir():
         if item.is_dir():
             cleanup_empty_folders(item)
-            # Try to remove if empty
+            # Try to remove if empty and not in preserve list
             try:
-                if not any(item.iterdir()):
+                if not any(item.iterdir()) and item.name.lower() not in PRESERVE_FOLDERS:
                     item.rmdir()
                     print(f"  Removed empty folder: {item.relative_to(VAULT_PATH)}")
             except OSError:
